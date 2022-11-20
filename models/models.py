@@ -55,7 +55,7 @@ class Seat(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(250))
     is_active = db.Column(db.Boolean(), default=True)
-    rooms = db.relationship('Room', backref='seat')
+    rooms = db.relationship('Room', backref='seat_room')
     created_at = db.Column(db.types.DateTime(timezone=True), default=datetime.datetime.utcnow)
 
 
@@ -76,8 +76,14 @@ class User(db.Model):
     email = db.Column(db.String(250))
     phone = db.Column(db.String(250))
     buy_tickets = db.relationship('BuyTicket', backref='user')
-    buy_tickets_details = db.relationship('BuyTicketDetail', backref='user')
     created_at = db.Column(db.types.DateTime(timezone=True), default=datetime.datetime.utcnow)
+
+    def __init__(self, name, last_name, password, email, phone,):
+        self.name = name
+        self.last_name = last_name
+        self.password = password
+        self.email = email
+        self.phone = phone
 
 
 class BuyTicket(db.Model):
@@ -90,6 +96,5 @@ class BuyTicket(db.Model):
 class BuyTicketDetail(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     room_id = db.Column(db.Integer(), db.ForeignKey(Room.id))
-    user_id = db.Column(db.Integer(), db.ForeignKey(User.id))
 
     
