@@ -1,5 +1,10 @@
 import datetime
 
+from functools import wraps
+
+import jwt
+from flask import request, jsonify
+
 from database import db
 
 
@@ -70,20 +75,22 @@ class Room(db.Model):
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(250))
+    name = db.Column(db.String(250), nullable=False)
     last_name = db.Column(db.String(250))
-    password = db.Column(db.String(250))
-    email = db.Column(db.String(250))
+    password = db.Column(db.String(250), nullable=False)
+    user_token = db.Column(db.String(250))
+    email = db.Column(db.String(250), unique=True, nullable=False)
     phone = db.Column(db.String(250))
     buy_tickets = db.relationship('BuyTicket', backref='user')
     created_at = db.Column(db.types.DateTime(timezone=True), default=datetime.datetime.utcnow)
 
-    def __init__(self, name, last_name, password, email, phone,):
+    def __init__(self, name, last_name, password, email, phone, user_token ):
         self.name = name
         self.last_name = last_name
         self.password = password
         self.email = email
         self.phone = phone
+        self.user_token = user_token
 
 
 class BuyTicket(db.Model):
@@ -96,5 +103,3 @@ class BuyTicket(db.Model):
 class BuyTicketDetail(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     room_id = db.Column(db.Integer(), db.ForeignKey(Room.id))
-
-    
