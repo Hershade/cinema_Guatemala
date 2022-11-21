@@ -1,10 +1,5 @@
 import datetime
 
-from functools import wraps
-
-import jwt
-from flask import request, jsonify
-
 from database import db
 
 
@@ -98,8 +93,15 @@ class BuyTicket(db.Model):
     date_time = db.Column(db.types.DateTime(timezone=True))
     user_id = db.Column(db.Integer(), db.ForeignKey(User.id))
     created_at = db.Column(db.types.DateTime(timezone=True), default=datetime.datetime.utcnow)
+    buy_tickets_details = db.relationship('BuyTicketDetail', backref='buy_ticket')
 
 
 class BuyTicketDetail(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     room_id = db.Column(db.Integer(), db.ForeignKey(Room.id))
+    buy_tickets_id = db.Column(db.Integer(), db.ForeignKey(BuyTicket.id))
+
+    def __init__(self, room_id, buy_tickets_id):
+        self.room_id = room_id
+        self.buy_tickets_id = buy_tickets_id
+
