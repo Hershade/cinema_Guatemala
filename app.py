@@ -8,7 +8,7 @@ from werkzeug.security import check_password_hash
 
 from database import db
 from feature.api import show_features
-from models.models import User
+from models.models import User, BuyTicket, Room, BuyTicketDetail
 from movie.api import show_movies
 from user.api import register_user
 
@@ -48,6 +48,7 @@ def token_required(f):
             return jsonify({'message': 'a valid token is missing'})
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            app.logger.debug(data)
             current_user = User.query.filter_by(user_token=data['user_token']).first()
         except:
             return jsonify({'message': 'token is invalid'})
@@ -55,6 +56,7 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
 
     return decorator
+
 
 # Create a token when the user is log in
 def login_user():
@@ -66,11 +68,42 @@ def login_user():
     user = User.query.filter_by(email=auth.username).first()
     if check_password_hash(user.password, auth.password):
         token = jwt.encode(
-            {'user_token': user.user_token, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=5)},
+            {'user_token': user.user_token, 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=5)},
             app.config['SECRET_KEY'], "HS256")
 
         return jsonify({'token': token})
     return make_response('could not verify', 401, {'Authentication': 'login required'})
+
+
+@token_required
+def buy_tickets(current_user):
+    if request.method == 'POST':
+
+        if request.is_json:
+            data = request.get_json()
+            for i in data:
+                room = Room.query.get(i["room_id"])
+                # validate_seat(i["room_id"])
+                if room is None:
+                    return make_response('This seat does not exist', 400, {'room_id': 'object does not exist'})
+                elif room is not None:
+                    if not room.is_empty:
+                        return make_response(f'This seat {room.name} is not available', 400)
+
+            new_purchase = BuyTicket(user_id=current_user.id)
+            db.session.add(new_purchase)
+            db.session.commit()
+            for i in data:
+                new_detail = BuyTicketDetail(room_id=i["room_id"], buy_tickets_id=new_purchase.id)
+                db.session.add(new_detail)
+                db.session.commit()
+                # change the status of the seat to True
+                room = Room.query.get(i.room_id)
+                room.is_empty = False
+                db.session.commit()
+            return make_response("Your tickets was bought successfully")
+        else:
+            return {"error": "The request payload is not in Json format"}
 
 
 # Routes of my endpoints
@@ -78,3 +111,4 @@ app.add_url_rule('/movies', 'movies', show_movies, methods=['POST', 'GET'])
 app.add_url_rule('/features', 'features', show_features, methods=['GET'])
 app.add_url_rule('/registration', 'registration', register_user, methods=['POST', 'GET'])
 app.add_url_rule('/login', 'logins', login_user, methods=['POST'])
+app.add_url_rule('/buy', 'buys', buy_tickets, methods=['POST'])
