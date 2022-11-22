@@ -88,7 +88,7 @@ def buy_tickets(current_user):
                     return make_response('This seat does not exist', 400, {'room_id': 'object does not exist'})
                 elif room is not None:
                     if not room.is_empty:
-                        return make_response(f'This seat {room.name} is not available', 400)
+                        return make_response(f'This seat {room.id} is not available', 400)
 
             new_purchase = BuyTicket(user_id=current_user.id)
             db.session.add(new_purchase)
@@ -98,12 +98,39 @@ def buy_tickets(current_user):
                 db.session.add(new_detail)
                 db.session.commit()
                 # change the status of the seat to True
-                room = Room.query.get(i.room_id)
+                room = Room.query.get(i["room_id"])
                 room.is_empty = False
                 db.session.commit()
             return make_response("Your tickets was bought successfully")
         else:
             return {"error": "The request payload is not in Json format"}
+
+# Method to cancel the user's purchase
+@token_required
+def cancel_tickets(current_user,id):
+    if request.method == 'PATCH':
+        purchase = BuyTicket.query.filter_by(id=id).first()
+        if purchase is None:
+            return make_response('This purchase does not exist', 400,{'purchase': 'object does not exist'})
+        elif purchase is not None:
+            app.logger.debug(purchase.canceled)
+            if purchase.canceled:
+                return make_response(f'This purchase {purchase.id} has already been cancelled', 400)
+            elif not purchase.canceled:
+                purchase_detail = BuyTicketDetail.query.filter_by(buy_tickets_id=id).all()
+                for detail in purchase_detail:
+                    # detail.room_id
+                    seats = Room.query.filter_by(id=detail.room_id).first()
+                    seats.is_empty = True
+                    db.session.commit()
+                    purchase.canceled = True
+                    db.session.commit()
+                return make_response("Your purchase was canceled successfully")
+            else:
+                return {"error": "The request payload is not in Json format"}
+
+
+
 
 
 # Routes of my endpoints
@@ -112,3 +139,4 @@ app.add_url_rule('/features', 'features', show_features, methods=['GET'])
 app.add_url_rule('/registration', 'registration', register_user, methods=['POST', 'GET'])
 app.add_url_rule('/login', 'logins', login_user, methods=['POST'])
 app.add_url_rule('/buy', 'buys', buy_tickets, methods=['POST'])
+app.add_url_rule('/canceled/<int:id>/', 'canceled', cancel_tickets, methods=['PATCH'])
