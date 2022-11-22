@@ -90,10 +90,10 @@ class User(db.Model):
 
 class BuyTicket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    date_time = db.Column(db.types.DateTime(timezone=True))
     user_id = db.Column(db.Integer(), db.ForeignKey(User.id))
     created_at = db.Column(db.types.DateTime(timezone=True), default=datetime.datetime.utcnow)
     buy_tickets_details = db.relationship('BuyTicketDetail', backref='buy_ticket')
+    canceled = db.Column(db.Boolean(), default=False)
 
 
 class BuyTicketDetail(db.Model):
