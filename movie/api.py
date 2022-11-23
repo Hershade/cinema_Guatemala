@@ -8,15 +8,15 @@ from models.models import Movie, Feature
 def features_view(model, id):
     all_features = model.query.filter_by(movies_id=id).all()
     results = [
-            {
-                "id": feature.id,
-                "date_time": feature.date_time,
-                "created_at": feature.created_at,
-                "movies_id": feature.movies_id,
-                "rooms": feature.rooms,
+        {
+            "id": feature.id,
+            "date_time": feature.date_time,
+            "created_at": feature.created_at,
+            "movies_id": feature.movies_id,
+            "rooms": feature.rooms,
 
-            }
-            for feature in all_features]
+        }
+        for feature in all_features]
     return results
 
 
