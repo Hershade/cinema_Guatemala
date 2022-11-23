@@ -107,11 +107,11 @@ def buy_tickets(current_user):
 
 # Method to cancel the user's purchase
 @token_required
-def cancel_tickets(current_user,id):
+def buy_tickets_view(current_user, id):
     if request.method == 'PATCH':
         purchase = BuyTicket.query.filter_by(id=id).first()
         if purchase is None:
-            return make_response('This purchase does not exist', 400,{'purchase': 'object does not exist'})
+            return make_response('This purchase does not exist', 400, {'purchase': 'object does not exist'})
         elif purchase is not None:
             app.logger.debug(purchase.canceled)
             if purchase.canceled:
@@ -128,9 +128,36 @@ def cancel_tickets(current_user,id):
                 return make_response("Your purchase was canceled successfully")
             else:
                 return {"error": "The request payload is not in Json format"}
-
-
-
+    elif request.method == 'GET':
+        purchase = BuyTicket.query.filter_by(id=id).first()
+        if purchase is None:
+            return make_response('This purchase does not exist', 400, {'purchase': 'object does not exist'})
+        elif purchase is not None:
+            purchase_details = BuyTicketDetail.query.filter_by(buy_tickets_id=id).all()
+            data = {
+                "id": purchase.id,
+                "canceled": purchase.canceled
+            }
+            results = []
+            for detail in purchase_details:
+                room_object = Room.query.get(detail.room_id)
+                ticket = {
+                    "ticket_id": detail.id,
+                    "seats": room_object.seat.name,
+                    "B-Feature": {
+                        "feature_id": room_object.feature.id,
+                        "date_time": room_object.feature.date_time,
+                        "C-Movie": {
+                            "movie_id": room_object.feature.movie.id,
+                            "movie_title": room_object.feature.movie.title,
+                            "movie_url_image": room_object.feature.movie.url_image,
+                            "movie_classification": room_object.feature.movie.classification,
+                        }
+                    },
+                }
+                results.append(ticket)
+                data.update({"detail": results})
+            return make_response(data)
 
 
 # Routes of my endpoints
@@ -139,4 +166,4 @@ app.add_url_rule('/features', 'features', show_features, methods=['GET'])
 app.add_url_rule('/registration', 'registration', register_user, methods=['POST', 'GET'])
 app.add_url_rule('/login', 'logins', login_user, methods=['POST'])
 app.add_url_rule('/buy', 'buys', buy_tickets, methods=['POST'])
-app.add_url_rule('/canceled/<int:id>/', 'canceled', cancel_tickets, methods=['PATCH'])
+app.add_url_rule('/sale/<int:id>/', 'sale', buy_tickets_view, methods=['PATCH', 'GET'])
