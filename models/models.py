@@ -36,7 +36,7 @@ class Feature(db.Model):
     date_time = db.Column(db.types.DateTime(timezone=True))
     created_at = db.Column(db.types.DateTime(timezone=True), default=datetime.datetime.utcnow)
     movies_id = db.Column(db.Integer(), db.ForeignKey(Movie.id))
-    rooms = db.relationship('Room', backref='seat')
+    rooms = db.relationship('Room', backref='feature')
 
     def __init__(self, date_time, movies_id):
         self.date_time = date_time
@@ -55,7 +55,7 @@ class Seat(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(250))
     is_active = db.Column(db.Boolean(), default=True)
-    rooms = db.relationship('Room', backref='seat_room')
+    rooms = db.relationship('Room', backref='seat')
     created_at = db.Column(db.types.DateTime(timezone=True), default=datetime.datetime.utcnow)
 
 
@@ -66,6 +66,12 @@ class Room(db.Model):
     is_empty = db.Column(db.Boolean(), default=True)
     buy_tickets_details = db.relationship('BuyTicketDetail', backref='room')
     created_at = db.Column(db.types.DateTime(timezone=True), default=datetime.datetime.utcnow)
+
+    def __init__(self, features_id, seats_id, is_empty, buy_tickets_details):
+        self.features_id = features_id
+        self.seats_id = seats_id
+        self.is_empty = is_empty
+        self.buy_tickets_details = buy_tickets_details
 
 
 class User(db.Model):
@@ -79,7 +85,7 @@ class User(db.Model):
     buy_tickets = db.relationship('BuyTicket', backref='user')
     created_at = db.Column(db.types.DateTime(timezone=True), default=datetime.datetime.utcnow)
 
-    def __init__(self, name, last_name, password, email, phone, user_token ):
+    def __init__(self, name, last_name, password, email, phone, user_token):
         self.name = name
         self.last_name = last_name
         self.password = password
@@ -105,3 +111,8 @@ class BuyTicketDetail(db.Model):
         self.room_id = room_id
         self.buy_tickets_id = buy_tickets_id
 
+    def __str__(self):
+        return (
+            f'id:{self.room_id}, '
+            f'title: {self.buy_tickets_id}, '
+        )
