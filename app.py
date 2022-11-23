@@ -1,4 +1,7 @@
-import datetime
+from datetime import datetime, timedelta
+import dateutil
+import dateutil.parser
+import pytz
 from functools import wraps
 
 import jwt
@@ -48,7 +51,6 @@ def token_required(f):
             return jsonify({'message': 'a valid token is missing'})
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            app.logger.debug(data)
             current_user = User.query.filter_by(user_token=data['user_token']).first()
         except:
             return jsonify({'message': 'token is invalid'})
@@ -61,14 +63,15 @@ def token_required(f):
 # Create a token when the user is log in
 def login_user():
     auth = request.authorization
-    app.logger.debug(f'this is {auth}')
     if not auth or not auth.username or not auth.password:
         return make_response('could not verify', 401, {'Authentication': 'login required'})
 
     user = User.query.filter_by(email=auth.username).first()
+    if user is None:
+        return make_response("Your email and password does not match", 400)
     if check_password_hash(user.password, auth.password):
         token = jwt.encode(
-            {'user_token': user.user_token, 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=5)},
+            {'user_token': user.user_token, 'exp': datetime.utcnow() + timedelta(hours=5)},
             app.config['SECRET_KEY'], "HS256")
 
         return jsonify({'token': token})
@@ -83,16 +86,18 @@ def buy_tickets(current_user):
             data = request.get_json()
             for i in data:
                 room = Room.query.get(i["room_id"])
-                # validate_seat(i["room_id"])
+                # validate seat does not exist
                 if room is None:
                     return make_response('This seat does not exist', 400, {'room_id': 'object does not exist'})
+                # validate the seat exist but is not empty
                 elif room is not None:
                     if not room.is_empty:
                         return make_response(f'This seat {room.id} is not available', 400)
-
+                # If the seat exist and is empty create the sale
             new_purchase = BuyTicket(user_id=current_user.id)
             db.session.add(new_purchase)
             db.session.commit()
+            # Create the sale details
             for i in data:
                 new_detail = BuyTicketDetail(room_id=i["room_id"], buy_tickets_id=new_purchase.id)
                 db.session.add(new_detail)
@@ -101,38 +106,60 @@ def buy_tickets(current_user):
                 room = Room.query.get(i["room_id"])
                 room.is_empty = False
                 db.session.commit()
-            return make_response("Your tickets was bought successfully")
+            return make_response("Your tickets was bought successfully", 200)
         else:
             return {"error": "The request payload is not in Json format"}
+
 
 # Method to cancel the user's purchase
 @token_required
 def buy_tickets_view(current_user, id):
+    # If the request is PATCH I must validate if the purchase meets the requirements to be validated.
     if request.method == 'PATCH':
+        # Obtain the purchase id
         purchase = BuyTicket.query.filter_by(id=id).first()
+        # validate the purchase id
         if purchase is None:
             return make_response('This purchase does not exist', 400, {'purchase': 'object does not exist'})
+        # validate if the purchase is already cancelled
         elif purchase is not None:
-            app.logger.debug(purchase.canceled)
             if purchase.canceled:
                 return make_response(f'This purchase {purchase.id} has already been cancelled', 400)
-            elif not purchase.canceled:
-                purchase_detail = BuyTicketDetail.query.filter_by(buy_tickets_id=id).all()
-                for detail in purchase_detail:
-                    # detail.room_id
-                    seats = Room.query.filter_by(id=detail.room_id).first()
-                    seats.is_empty = True
-                    db.session.commit()
-                    purchase.canceled = True
-                    db.session.commit()
-                return make_response("Your purchase was canceled successfully")
+            # if the purchase is not cancelled I  will do it
             else:
-                return {"error": "The request payload is not in Json format"}
+                # acces to the purchase detail
+                validation_details = BuyTicketDetail.query.filter_by(buy_tickets_id=id).first()
+                # I create an object to obtain the necessary information in this case the id of the ticket and the date and time of the feature of that ticket.
+                validation_object = Room.query.get(validation_details.room_id)
+                date_time = validation_object.feature.date_time
+                # I create a variable to obtain the current date-time
+                today = datetime.now()
+                # Convert the current date-time in to a iso format and then convert it in aware format, so that I can compare it with my date and time in the database.
+                dt = today.isoformat()
+                date_convert = dateutil.parser.parse(dt)
+                aware = date_convert.replace(tzinfo=pytz.UTC)
+                # compare the current date-time and the date-time from the feature in the database, if current date-time > feature date-time sale can not cancelled
+                if aware >= date_time:
+                    return make_response("Sorry, this ticket has exceeded the time limit to be cancelled.", 400)
+                else:
+                    # if current date-time < feature date-time the sales will be cancelled
+                    purchase_detail = BuyTicketDetail.query.filter_by(buy_tickets_id=id).all()
+                    for detail in purchase_detail:
+                        seats = Room.query.filter_by(id=detail.room_id).first()
+                        seats.is_empty = True
+                        db.session.commit()
+                        purchase.canceled = True
+                        db.session.commit()
+                    return make_response("Your purchase was canceled successfully")
+    # Here I obtain the sale information
     elif request.method == 'GET':
+        # obtain the sale id
         purchase = BuyTicket.query.filter_by(id=id).first()
         if purchase is None:
+            # validate if the sale exist
             return make_response('This purchase does not exist', 400, {'purchase': 'object does not exist'})
         elif purchase is not None:
+            # sale exist but I show the status , Cancel = True or False
             purchase_details = BuyTicketDetail.query.filter_by(buy_tickets_id=id).all()
             data = {
                 "id": purchase.id,
@@ -144,10 +171,10 @@ def buy_tickets_view(current_user, id):
                 ticket = {
                     "ticket_id": detail.id,
                     "seats": room_object.seat.name,
-                    "B-Feature": {
+                    "Feature": {
                         "feature_id": room_object.feature.id,
                         "date_time": room_object.feature.date_time,
-                        "C-Movie": {
+                        "Movie": {
                             "movie_id": room_object.feature.movie.id,
                             "movie_title": room_object.feature.movie.title,
                             "movie_url_image": room_object.feature.movie.url_image,
