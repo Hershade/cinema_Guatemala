@@ -13,8 +13,6 @@ def features_view(model, id):
             "date_time": feature.date_time,
             "created_at": feature.created_at,
             "movies_id": feature.movies_id,
-            "rooms": feature.rooms,
-
         }
         for feature in all_features]
     return results
